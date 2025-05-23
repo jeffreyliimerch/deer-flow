@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "mcp-twitter":{
+        "transport": "sse",
+        "url": "http://34.216.103.243:8000/mcp",
+        "enabled_tools": [
+          "get_health_v1_health_get",
+          "get_user_id",
+          "get_user_info",
+          "get_user_following",
+          "get_user_followers",
+          "search_twitter_top",
+          "search_twitter_people",
+          "search_twitter_latest",
+          "get_tweet_details",
+          "get_user_tweets",
+          "save_user_tweets",
+          "publish_twitter_post",
+          "get_user_posts_db",
+          "get_user_post_analytics",
+          "get_reference_content",
+          "get_trending_reference_content",
+          "get_content_by_source"
+        ]
+    }
+  }
+} 

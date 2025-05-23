@@ -1,7 +1,7 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
-import asyncio
+import json
 import logging
 from src.graph import build_graph
 
@@ -49,6 +49,9 @@ async def run_agent_workflow_async(
         enable_debug_logging()
 
     logger.info(f"Starting async workflow with user input: {user_input}")
+
+    yield f"Starting async workflow with user input: {user_input}"
+
     initial_state = {
         # Runtime Variables
         "messages": [{"role": "user", "content": user_input}],
@@ -68,6 +71,22 @@ async def run_agent_workflow_async(
                         "args": ["mcp-github-trending"],
                         "enabled_tools": ["get_github_trending_repositories"],
                         "add_to_agents": ["researcher"],
+                    },
+                    "mcp-twitter":{
+                        "transport": "sse",
+                        "url": "http://34.216.103.243:8000/mcp",
+                        "enabled_tools": [
+                            "get_user_id",
+                            "get_user_info",
+                            "get_user_following",
+                            "get_user_followers",
+                            "search_twitter_top",
+                            "search_twitter_people",
+                            "search_twitter_latest",
+                            "get_tweet_details",
+                            "get_user_tweets",
+                        ],
+                        "add_to_agents": ["researcher"],
                     }
                 }
             },
@@ -75,27 +94,38 @@ async def run_agent_workflow_async(
         "recursion_limit": 100,
     }
     last_message_cnt = 0
-    async for s in graph.astream(
-        input=initial_state, config=config, stream_mode="values"
+    async for event in graph.astream_events(
+        input=initial_state, config=config, stream_mode="custom"
     ):
-        try:
-            if isinstance(s, dict) and "messages" in s:
-                if len(s["messages"]) <= last_message_cnt:
-                    continue
-                last_message_cnt = len(s["messages"])
-                message = s["messages"][-1]
-                if isinstance(message, tuple):
-                    print(message)
-                else:
-                    message.pretty_print()
-            else:
-                # For any other output format
-                print(f"Output: {s}")
-        except Exception as e:
-            logger.error(f"Error processing stream output: {e}")
-            print(f"Error processing output: {str(e)}")
+        if event["name"] == "deep_research_log_info":
+            yield f"event: {event["name"]}\n"
+            yield f"data: {json.dumps(event['data'])}\n\n"
+        # try:
+        #     if isinstance(s, dict) and "messages" in s:
+        #         if len(s["messages"]) <= last_message_cnt:
+        #             continue
+        #         last_message_cnt = len(s["messages"])
+        #         message = s["messages"][-1]
+        #         if isinstance(message, tuple):
+        #             yield (message)
+        #         else:
+        #             yield (message.pretty_print())
+        #     else:
+        #         # For any other output format
+        #         yield (f"Output: {s}")
+
+        # except Exception as e:
+        #     logger.error(f"Error processing stream output: {e}")
+        #     print(f"Error processing output: {str(e)}")
+
 
     logger.info("Async workflow completed successfully")
+    yield "event: final_report\n"
+    try:
+        yield f"data: {json.dumps({'message': event['data']['output']['final_report']})}\n\n"
+    except Exception as e:
+        import code; code.interact(local=dict(globals(), **locals()))
+        logger.error(f"Error processing output: {event['data']["output"]}")
 
 
 if __name__ == "__main__":

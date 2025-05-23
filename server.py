@@ -35,8 +35,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--port",
         type=int,
-        default=8000,
-        help="Port to bind the server to (default: 8000)",
+        default=3031,
+        help="Port to bind the server to (default: 3031)",
     )
     parser.add_argument(
         "--log-level",
@@ -44,6 +44,12 @@ if __name__ == "__main__":
         default="info",
         choices=["debug", "info", "warning", "error", "critical"],
         help="Log level (default: info)",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        help="Number of worker processes (default: 4)",
     )
 
     args = parser.parse_args()
@@ -55,6 +61,8 @@ if __name__ == "__main__":
     if args.reload:
         reload = True
 
+    
+
     logger.info("Starting DeerFlow API server")
     uvicorn.run(
         "src.server:app",
@@ -62,4 +70,5 @@ if __name__ == "__main__":
         port=args.port,
         reload=reload,
         log_level=args.log_level,
+        workers=args.workers,
     )

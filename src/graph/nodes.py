@@ -26,7 +26,7 @@ from src.llms.llm import get_llm_by_type
 from src.prompts.planner_model import Plan, StepType
 from src.prompts.template import apply_prompt_template
 from src.utils.json_utils import repair_json_output
-
+from langchain_core.callbacks.manager import adispatch_custom_event
 from .types import State
 from ..config import SEARCH_MAX_RESULTS, SELECTED_SEARCH_ENGINE, SearchEngine
 
@@ -44,8 +44,9 @@ def handoff_to_planner(
     return
 
 
-def background_investigation_node(state: State) -> Command[Literal["planner"]]:
+async def background_investigation_node(state: State) -> Command[Literal["planner"]]:
     logger.info("background investigation node is running.")
+    await adispatch_custom_event("deep_research_log_info", {"message": "background investigation node is running."})
     query = state["messages"][-1].content
     if SELECTED_SEARCH_ENGINE == SearchEngine.TAVILY:
         searched_content = LoggedTavilySearch(max_results=SEARCH_MAX_RESULTS).invoke(
@@ -61,6 +62,7 @@ def background_investigation_node(state: State) -> Command[Literal["planner"]]:
             logger.error(
                 f"Tavily search returned malformed response: {searched_content}"
             )
+            await adispatch_custom_event("deep_research_log_error", {"message": f"Tavily search returned malformed response: {searched_content}"})
     else:
         background_investigation_results = web_search_tool.invoke(query)
     return Command(
@@ -73,11 +75,12 @@ def background_investigation_node(state: State) -> Command[Literal["planner"]]:
     )
 
 
-def planner_node(
+async def planner_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["human_feedback", "reporter"]]:
     """Planner node that generate the full plan."""
     logger.info("Planner generating full plan")
+    await adispatch_custom_event("deep_research_log_info", {"message": "Planner generating full plan"})
     configurable = Configuration.from_runnable_config(config)
     plan_iterations = state["plan_iterations"] if state.get("plan_iterations", 0) else 0
     messages = apply_prompt_template("planner", state, configurable)
@@ -111,15 +114,20 @@ def planner_node(
         return Command(goto="reporter")
 
     full_response = ""
+    dispatch_response = ""
     if AGENT_LLM_MAP["planner"] == "basic":
         response = llm.invoke(messages)
+        # import code; code.interact(local=dict(globals(), **locals()))
         full_response = response.model_dump_json(indent=4, exclude_none=True)
+        dispatch_response = response.title
     else:
         response = llm.stream(messages)
         for chunk in response:
             full_response += chunk.content
+            dispatch_response += chunk.content
     logger.debug(f"Current state messages: {state['messages']}")
     logger.info(f"Planner response: {full_response}")
+    await adispatch_custom_event("deep_research_log_info", {"message": f"Planner response: {dispatch_response}"})
 
     try:
         curr_plan = json.loads(repair_json_output(full_response))
@@ -131,6 +139,7 @@ def planner_node(
             return Command(goto="__end__")
     if curr_plan.get("has_enough_context"):
         logger.info("Planner response has enough context.")
+        await adispatch_custom_event("deep_research_log_info", {"message": "Planner response has enough context."})
         new_plan = Plan.model_validate(curr_plan)
         return Command(
             update={
@@ -148,7 +157,7 @@ def planner_node(
     )
 
 
-def human_feedback_node(
+async def human_feedback_node(
     state,
 ) -> Command[Literal["planner", "research_team", "reporter", "__end__"]]:
     current_plan = state.get("current_plan", "")
@@ -169,6 +178,7 @@ def human_feedback_node(
             )
         elif feedback and str(feedback).upper().startswith("[ACCEPTED]"):
             logger.info("Plan is accepted by user.")
+            await adispatch_custom_event("deep_research_log_info", {"message": "Plan is accepted by user."})
         else:
             raise TypeError(f"Interrupt value of {feedback} is not supported.")
 
@@ -200,11 +210,12 @@ def human_feedback_node(
     )
 
 
-def coordinator_node(
+async def coordinator_node(
     state: State,
 ) -> Command[Literal["planner", "background_investigator", "__end__"]]:
     """Coordinator node that communicate with customers."""
     logger.info("Coordinator talking.")
+    await adispatch_custom_event("deep_research_log_info", {"message": "Coordinator talking."})
     messages = apply_prompt_template("coordinator", state)
     response = (
         get_llm_by_type(AGENT_LLM_MAP["coordinator"])
@@ -230,6 +241,7 @@ def coordinator_node(
                     break
         except Exception as e:
             logger.error(f"Error processing tool calls: {e}")
+            await adispatch_custom_event("deep_research_log_error", {"message": f"Error processing tool calls: {e}"})
     else:
         logger.warning(
             "Coordinator response contains no tool calls. Terminating workflow execution."
@@ -242,9 +254,10 @@ def coordinator_node(
     )
 
 
-def reporter_node(state: State):
+async def reporter_node(state: State):
     """Reporter node that write a final report."""
     logger.info("Reporter write final report")
+    await adispatch_custom_event("deep_research_log_info", {"message": "Reporter write final report"})
     current_plan = state.get("current_plan")
     input_ = {
         "messages": [
@@ -276,15 +289,17 @@ def reporter_node(state: State):
     response = get_llm_by_type(AGENT_LLM_MAP["reporter"]).invoke(invoke_messages)
     response_content = response.content
     logger.info(f"reporter response: {response_content}")
+    await adispatch_custom_event("deep_research_log_info", {"message": f"reporter response: {response_content}"})
 
     return {"final_report": response_content}
 
 
-def research_team_node(
+async def research_team_node(
     state: State,
 ) -> Command[Literal["planner", "researcher", "coder"]]:
     """Research team node that collaborates on tasks."""
     logger.info("Research team is collaborating on tasks.")
+    await adispatch_custom_event("deep_research_log_info", {"message": "Research team is collaborating on tasks."})
     current_plan = state.get("current_plan")
     if not current_plan or not current_plan.steps:
         return Command(goto="planner")
@@ -322,6 +337,7 @@ async def _execute_agent_step(
         return Command(goto="research_team")
 
     logger.info(f"Executing step: {current_step.title}")
+    await adispatch_custom_event("deep_research_log_info", {"message": f"Executing step: {current_step.title}"})
 
     # Format completed steps information
     completed_steps_info = ""
@@ -359,7 +375,7 @@ async def _execute_agent_step(
     # Update the step with the execution result
     current_step.execution_res = response_content
     logger.info(f"Step '{current_step.title}' execution completed by {agent_name}")
-
+    await adispatch_custom_event("deep_research_log_info", {"message": f"Step '{current_step.title}' execution completed by {agent_name}"})
     return Command(
         update={
             "messages": [
@@ -439,12 +455,13 @@ async def researcher_node(
 ) -> Command[Literal["research_team"]]:
     """Researcher node that do research"""
     logger.info("Researcher node is researching.")
+    await adispatch_custom_event("deep_research_log_info", {"message": "Researcher node is researching."})
     return await _setup_and_execute_agent_step(
         state,
         config,
         "researcher",
         research_agent,
-        [web_search_tool, crawl_tool],
+        [],
     )
 
 
@@ -453,6 +470,7 @@ async def coder_node(
 ) -> Command[Literal["research_team"]]:
     """Coder node that do code analysis."""
     logger.info("Coder node is coding.")
+    await adispatch_custom_event("deep_research_log_info", {"message": "Coder node is coding."})
     return await _setup_and_execute_agent_step(
         state,
         config,

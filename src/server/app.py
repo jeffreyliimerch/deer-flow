@@ -26,9 +26,13 @@ from src.server.chat_request import (
     GenerateProseRequest,
     TTSRequest,
 )
+from src.server.ask_request import AskRequest
 from src.server.mcp_request import MCPServerMetadataRequest, MCPServerMetadataResponse
 from src.server.mcp_utils import load_mcp_tools
 from src.tools import VolcengineTTS
+from src.workflow import run_agent_workflow_async
+
+import queue
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +52,29 @@ app.add_middleware(
 )
 
 graph = build_graph_with_memory()
+
+
+@app.post("/api/ask")
+async def ask(request: AskRequest):
+    # res = await run_agent_workflow_async(
+    #         user_input=request.question,
+    #         max_plan_iterations=request.max_plan_iterations,
+    #         max_step_num=request.max_step_num,
+    #         enable_background_investigation=request.enable_background_investigation,
+    #     )
+    
+    # assert isinstance(res, str)
+    # return Response(content=res, media_type="text/event-stream")
+
+    return StreamingResponse(
+        run_agent_workflow_async(
+            user_input=request.question,
+            max_plan_iterations=request.max_plan_iterations,
+            max_step_num=request.max_step_num,
+            enable_background_investigation=request.enable_background_investigation,
+        ),
+        media_type="text/event-stream",
+    )
 
 
 @app.post("/api/chat/stream")
