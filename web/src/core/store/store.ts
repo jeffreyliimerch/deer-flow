@@ -104,6 +104,7 @@ export async function sendMessage(
         settings.enableBackgroundInvestigation ?? true,
       max_plan_iterations: settings.maxPlanIterations,
       max_step_num: settings.maxStepNum,
+      max_search_results: settings.maxSearchResults,
       mcp_settings: settings.mcpSettings,
     },
     options,
@@ -376,4 +377,15 @@ export function useLastFeedbackMessageId() {
     }),
   );
   return waitingForFeedbackMessageId;
+}
+
+export function useToolCalls() {
+  return useStore(
+    useShallow((state) => {
+      return state.messageIds
+        ?.map((id) => getMessage(id)?.toolCalls)
+        .filter((toolCalls) => toolCalls != null)
+        .flat();
+    }),
+  );
 }

@@ -7,7 +7,8 @@ Server script for running the DeerFlow API.
 
 import argparse
 import logging
-
+import signal
+import sys
 import uvicorn
 
 # Configure logging
@@ -17,6 +18,17 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+def handle_shutdown(signum, frame):
+    """Handle graceful shutdown on SIGTERM/SIGINT"""
+    logger.info("Received shutdown signal. Starting graceful shutdown...")
+    sys.exit(0)
+
+
+# Register signal handlers
+signal.signal(signal.SIGTERM, handle_shutdown)
+signal.signal(signal.SIGINT, handle_shutdown)
 
 if __name__ == "__main__":
     # Parse command line arguments
@@ -56,8 +68,6 @@ if __name__ == "__main__":
 
     # Determine reload setting
     reload = False
-
-    # Command line arguments override defaults
     if args.reload:
         reload = True
 
