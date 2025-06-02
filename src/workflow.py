@@ -74,7 +74,7 @@ async def run_agent_workflow_async(
                     },
                     "mcp-twitter":{
                         "transport": "sse",
-                        "url": "http://34.216.103.243:8000/mcp",
+                        "url": "https://x-tools.imerchstaging.com/mcp",
                         "enabled_tools": [
                             "get_user_id",
                             "get_user_info",
@@ -85,6 +85,7 @@ async def run_agent_workflow_async(
                             "search_twitter_latest",
                             "get_tweet_details",
                             "get_user_tweets",
+                            "get_user_tweets_stats",
                         ],
                         "add_to_agents": ["researcher"],
                     }
