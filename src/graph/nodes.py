@@ -260,7 +260,7 @@ async def coordinator_node(
 async def reporter_node(state: State):
     """Reporter node that write a final report."""
     logger.info("Reporter write final report")
-    await adispatch_custom_event("deep_research_log_info", {"message": "Writing case study report"})
+    await adispatch_custom_event("deep_research_log_info", {"message": "Writing report"})
     current_plan = state.get("current_plan")
     input_ = {
         "messages": [
