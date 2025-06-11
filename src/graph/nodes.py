@@ -446,27 +446,32 @@ async def _setup_and_execute_agent_step(
     # Extract MCP server configuration for this agent type
     if configurable.mcp_settings:
         for server_name, server_config in configurable.mcp_settings["servers"].items():
-            if (
-                server_config["enabled_tools"]
-                and agent_type in server_config["add_to_agents"]
-            ):
+            if agent_type in server_config["add_to_agents"]:
                 mcp_servers[server_name] = {
                     k: v
                     for k, v in server_config.items()
                     if k in ("transport", "command", "args", "url", "env")
                 }
-                for tool_name in server_config["enabled_tools"]:
-                    enabled_tools[tool_name] = server_name
+                # If enabled_tools is specified, use only those tools
+                if "enabled_tools" in server_config:
+                    for tool_name in server_config["enabled_tools"]:
+                        enabled_tools[tool_name] = server_name
+                else:
+                    # If no enabled_tools specified, mark the server to load all tools
+                    enabled_tools[server_name] = "*"
 
     # Create and execute agent with MCP tools if available
     if mcp_servers:
         async with MultiServerMCPClient(mcp_servers) as client:
             loaded_tools = default_tools[:]
             for tool in client.get_tools():
-                if tool.name in enabled_tools:
-                    tool.description = (
-                        f"Powered by '{enabled_tools[tool.name]}'.\n{tool.description}"
-                    )
+                server_name = next(
+                    (server for server, tools in enabled_tools.items() 
+                     if tools == "*" or tool.name in tools),
+                    None
+                )
+                if server_name:
+                    tool.description = f"Powered by '{server_name}'.\n{tool.description}"
                     loaded_tools.append(tool)
             agent = create_agent(agent_type, agent_type, loaded_tools, agent_type)
             return await _execute_agent_step(state, agent, agent_type)

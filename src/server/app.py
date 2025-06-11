@@ -32,7 +32,6 @@ from src.server.mcp_utils import load_mcp_tools
 from src.tools import VolcengineTTS
 from src.workflow import run_agent_workflow_async
 
-import queue
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +68,7 @@ async def ask(request: AskRequest):
     return StreamingResponse(
         run_agent_workflow_async(
             user_input=request.question,
+            mcp_server_json=request.mcp_server_json,
             max_plan_iterations=request.max_plan_iterations,
             max_step_num=request.max_step_num,
             enable_background_investigation=request.enable_background_investigation,
