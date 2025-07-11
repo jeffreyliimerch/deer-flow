@@ -73,20 +73,6 @@ async def run_agent_workflow_async(
                         "enabled_tools": ["get_github_trending_repositories"],
                         "add_to_agents": ["researcher"],
                     },
-                    # "mcp-twitter-research":{
-                    #     "transport": "sse",
-                    #     "url": "https://x-research.imerchstaging.com/sse",
-                    #     "enabled_tools": [
-                    #         "search-twitter-people", 
-                    #         "search-latest-tweets",
-                    #         "search-top-tweets",
-                    #         "get-twitter-user-details",
-                    #         "get-user-tweets",
-                    #         "get-user-followers",
-                    #         "get-user-following",
-                    #         ],
-                    #     "add_to_agents": ["researcher"],
-                    # },
                 }
             },
         },
@@ -97,6 +83,8 @@ async def run_agent_workflow_async(
     for server_name, server_config in mcp_server_config.items():
         config["configurable"]["mcp_settings"]["servers"][server_name] = server_config
         config["configurable"]["mcp_settings"]["servers"][server_name]["add_to_agents"] = ["researcher"]
+
+    # import code; code.interact(local=dict(globals(), **locals()))
     
     last_message_cnt = 0
     async for event in graph.astream_events(

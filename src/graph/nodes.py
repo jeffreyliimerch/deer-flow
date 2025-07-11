@@ -50,7 +50,7 @@ async def background_investigation_node(
     logger.info("background investigation node is running.")
     configurable = Configuration.from_runnable_config(config)
     query = state["messages"][-1].content
-    if SELECTED_SEARCH_ENGINE == SearchEngine.TAVILY:
+    if SELECTED_SEARCH_ENGINE == SearchEngine.TAVILY.value:
         searched_content = LoggedTavilySearch(
             max_results=configurable.max_search_results
         ).invoke({"query": query})
@@ -69,6 +69,11 @@ async def background_investigation_node(
         background_investigation_results = get_web_search_tool(
             configurable.max_search_results
         ).invoke(query)
+    
+    if background_investigation_results is None or any([error in background_investigation_results for error in ["HTTPError"]]):
+        logger.error(f"Tavily search returned Error: {background_investigation_results}")
+        return Command(goto="planner")
+    
     return Command(
         update={
             "background_investigation_results": json.dumps(
@@ -84,7 +89,7 @@ async def planner_node(
 ) -> Command[Literal["human_feedback", "reporter"]]:
     """Planner node that generate the full plan."""
     logger.info("Planner generating full plan")
-    await adispatch_custom_event("deep_research_log_info", {"message": "Generating research plan"})
+    await adispatch_custom_event("deep_research_log_info", {"message": "Planning..."})
     configurable = Configuration.from_runnable_config(config)
     plan_iterations = state["plan_iterations"] if state.get("plan_iterations", 0) else 0
     messages = apply_prompt_template("planner", state, configurable)
@@ -116,7 +121,7 @@ async def planner_node(
     # if the plan iterations is greater than the max plan iterations, return the reporter node
     if plan_iterations >= configurable.max_plan_iterations:
         return Command(goto="reporter")
-
+    
     full_response = ""
     dispatch_response = ""
     if AGENT_LLM_MAP["planner"] == "basic":
